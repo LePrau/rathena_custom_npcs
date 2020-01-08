@@ -1,0 +1,1129 @@
+//===== rAthena Script =======================================
+//= X-mas Event
+//===== By: ==================================================
+//= Mr.Amity aka LePrau https://github.com/LePrau/
+//= $svn.203-ef6a3b: S3ph1r0th
+//===== Current Version: =====================================
+//= 1.1 2020-01-08
+//===== Compatible With: =====================================
+//= rAthena Project
+//===== Description: =========================================
+//= Advent Calendar Script with randomized order, account locked.
+//= 
+//= Players have to wear a Santa Hat for the event, which they can
+//= obtain from Santa Clues
+//= After talking to Santa Clues,
+//= players get a hint for a house in prontera.
+//= 
+//= Reaching that house they get a code word.
+//=
+//= They have to go back to Santa Clues, tell him the word (type it, case does not matter)
+//= to get another hint.
+//= 
+//= Each day gives 3 more hints, and with 3 hints of a day you can
+//= then open the advent calendar box at the christmas tree
+//= Successfully opening the box yields a reward
+//===== Additional Comments: =================================
+//= For debugging / testing, you can use the Debug-Helper
+//= Simply whisper "NPC:XmasEvent" ingame with a gm level 99 account, to get
+//= the debug npc dialogue.
+//= It shows generic info about current accounts quest state
+//= You can enable/disable it for testing purposes or in case of an imurgoncay
+//= You can also set your (gm accounts) progress to a specific point, to check doors, hints, and rewards
+//= So you do not have to do 23 days of questing to check if day 24 reward actuially works.
+//=
+//============================================================
+function	script	getCalendarIndex	{ // another math magix
+	.@currentdoor = getarg(0);
+	.@maximum = getarraysize($@door_coordinates) / 2; // at this point we assume, it has been checked.
+	.@index = ((#advent_calendar_start + .@currentdoor * #advent_calendar_step) % .@maximum );
+	return .@index;
+}
+function	script	getRandEffect	{
+	.@maximum = getarraysize($@randeffects);
+	return $@randeffects[rand(0,.@maximum)];
+
+}
+
+//====
+//= Here comes the init!
+//= You may change settings which explicitly say //= Setting: in front. Other changes might break the internet.
+//====
+
+-	script	init_xmas	-1,{
+OnEnable:
+	.@month = gettime(DT_MONTH);
+	.@day = gettime(DT_DAYOFMONTH);
+	.@minute = gettime(DT_MINUTE);
+	$xmas_calendar_active = 1;
+	setnpcdisplay "Santa Clues",1244; //= Setting: Monster Sprite for Santa Clues
+	enablenpc "Santa Clues";
+	setnpcdisplay "Christmas Tree",723; //= Setting:  large shadow bubble NPC below the Christmas Tree in Prontera
+	enablenpc "Christmas Tree";
+	end;
+OnDisable:
+	$xmas_calendar_active = 0; // disabling all door NPC seems silly.
+	disablenpc "Santa Clues";
+	disablenpc "Christmas Tree";
+	end;
+OnMinute01: // on minute 01 every hour, so it triggers at 00:01
+OnInit: // ... and after reload / restart
+	.@month = gettime(DT_MONTH);
+	.@day = gettime(DT_DAYOFMONTH);
+	.@minute = gettime(DT_MINUTE);
+	if (.@month == DECEMBER) { // change to a different month if you want to do a similar event at some other month
+		$xmas_day_of_december = .@day;
+		donpcevent "init_xmas::OnEnable";
+	}
+	else {
+		$xmas_day_of_december = 0; // double-double-tap to make sure no one can get any reward!
+		donpcevent "init_xmas::OnDisable";
+	}
+	
+	//= Setting: mininmum base level to do the quest. 0 or 1 for no restriction (everyone is at least base level 1)
+	$xmas_minimum_baselevel = 50;
+	
+	$xmas_quest_hat = 2236; //= Setting: Default Item is a Santa Hat. You may change this, but it must be an upper headgear.
+	
+	//= Setting: 24 rewards for obviously 24 days. These are the same for all players. Feel free to change the item and the amount.
+	//= Format: item id, amount, (only one distinct item per day. If you want more, create containers)
+	setarray $@xmas_rewards[0],
+				664,1, // gift box, 1ea
+				12573,5, // fruit basket, 5ea
+				665,1, // another gift box 
+				12263,1, // 30min +100% Field Manual
+				666,1, //gift box
+				616,1, // Old Card Album, December 6th St. Niclas
+				664,2, // Gift Box
+				12264,1, // 30min +100% drop Bubble Gum
+				666,2, //GB
+				14527,10, // Dungeon Teleport Scroll
+				667,2, //GB
+				12198,10, // Lucky Rice Cake
+				664,3, //GB
+				12107,1, // Wrapped Mask
+				667,3, //GB
+				617,2, // Old Violet Box
+				665,3, //GB
+				19697,1, // Rudolph Santa Costume
+				664,3, //GB
+				12103,1, // Bloody Branch
+				664,3, //GB
+				12883,10, // Almighty
+				12106,1, // Jewelry Box
+				12246,1; // Mystical Card Album! Christmas!
+	
+	//= Setting: 83 hints, one for each door. You may change the words. They are displayed as here (in caps), but input will work no matter the case.
+	//= Make sure there are NO repetitions.
+	setarray $@door_hints$[0],
+					"FISH","GIFT","CAKE","TREE","HOME","MAIL","BUFF","SHOE","CANE","SNOW",
+                    "HORSE","PLANT","ROSE","CANDLE","ROOF","ICE","SLED","BOX","PAN","PICTURE",
+                    "POWER","LOVE","SMILE","CLOAK","PANTS","MILK","APPLE","OMEN","BAG","KISS",
+                    "COOKIE","COFFEE","FLOOR","CAT","DOG","BIRD","WIFE","MOTHER","FLOWER","WORLD",
+                    "NUTS","KEYBOARD","MOUSE","WATER","KETTLE","SUGAR","SHIRT","DICE","CARD","KING",
+                    "QUEEN","JACK","NIGHT","SANTA","PLATE","FORK","WAY","PAPER","TIARA","CROWN",
+                    "RIBBON","SHIELD","COASTER","SHIP","RUM","OCEAN","DOLPHIN","WHALE","EAGLE","YEAR",
+                    "RING","TOKEN","DOOR","CHAIR","PILLOW","COVER","BOTTLE","SHELL","TURTLE","HOUSE",
+                    "MAP","SOCK","FLUFFY";
+					
+	//= Setting: fallbacks for word collissions. Sometimes a "replacement" in the menu is the same as the actual keyword. We then just switch it for one of these
+	setarray $@badwords[0],"FIRE","PAIN","BLOOD","WOUND","FEAR";
+	
+	// effects to play at random when opening the doors and boxes
+	setarray $@randeffects[0], 66,67,75,76,84,85,86,41,42,40,38,37,88,98,103,154,155;
+	
+	// please do not change the amount of doors. It is 83 by now, which is a prime. This is basically required to make the script work.
+	setarray $@door_coordinates[0],
+				219,181,
+				224,160,
+				184,158,
+				269,219,
+				280,236,
+				273,257,
+				269,275,
+				239,267,
+				227,283,
+				186,248,
+				210,265,
+				215,247,
+				219,227,
+				204,216,
+				125,251,
+				102,265,
+				96,255,
+				84,248,
+				95,223,
+				107,191,
+				92,184,
+				94,167,
+				94,158,
+				100,149,
+				108,144,
+				122,144,
+				139,150,
+				105,167,
+				114,179,
+				165,167,
+				183,144,
+				183,130,
+				98,74,
+				91,45,
+				119,40,
+				164,41,
+				165,100,
+				184,108,
+				200,98,
+				216,100,
+				208,73,
+				197,57,
+				180,77,
+				188,48,
+				205,28,
+				219,40,
+				256,40,
+				271,42,
+				272,78,
+				273,96,
+				257,102,
+				256,123,
+				271,127,
+				241,142,
+				221,116,
+				235,108,
+				256,192,
+				279,195,
+				272,187,
+				269,160,
+				68,142,
+				86,125,
+				79,67,
+				71,37,
+				60,42,
+				41,44,
+				40,117,
+				38,134,
+				52,90,
+				58,157,
+				37,169,
+				33,156,
+				40,181,
+				36,226,
+				50,227,
+				58,249,
+				42,267,
+				40,279,
+				49,293,
+				57,294,
+				74,270,
+				71,284,
+				89,334;
+	end;
+}
+
+-	script	XmasEvent	-1,{ //= whisper "NPC:XmasEvent" to get the Debug menu for GMs
+OnWhisperGlobal:
+	if(getgmlevel() < 99) {
+		end;
+	}
+	.@keepdialogue = 1;
+	while (.@keepdialogue == 1
+	) {
+		.@calendar_index = ((#current_calendar_door-1) / 3) * 3 + 1; // round to first keyword of day
+		.@word1index = getCalendarIndex(.@calendar_index);
+		.@word2index = getCalendarIndex(.@calendar_index + 1);
+		.@word3index = getCalendarIndex(.@calendar_index + 2);
+		.@word1$ = $@door_hints$[.@word1index];
+		.@word2$ = $@door_hints$[.@word2index];
+		.@word3$ = $@door_hints$[.@word3index];
+		.@calendary_day = (((#current_calendar_door-1) / 3)+1);
+		.@keyword_number = ((#current_calendar_door-1) % 3 +1);
+		if ($xmas_calendar_active == 1) {
+			mes "^00AA33[Event active]^000000 Day "+$xmas_day_of_december;
+		}
+		else {
+			mes "^ff0000[Event inactive]^000000 Day "+$xmas_day_of_december;
+		}
+		mes " ";
+		mes "^0000ffAccount Quest Info:^000000";
+		mes "Hint ^ff0000"+#current_calendar_door+"^000000 ("+.@keyword_number+" of day "+.@calendary_day+")";
+		mes "keywords: ( ^0000ff"+.@word1$+", "+.@word2$+", "+.@word3$+"^000000 )";
+		mes "Box opened: "+#opened_calendar_door+" of 24";
+		mes "   [hint start ^ff0000"+#advent_calendar_start+"^000000 / step ^ff0000"+#advent_calendar_step+"^000000]";
+		switch (select("close:^ff0000global^000000 Enable:^ff0000global^000000 Disable:^ff0000global^000000 set Day:^0000ffaccount^000000 Reset Quest Progress:^0000ffaccount^000000 set last opened box:^0000ffaccount^000000 set hint number:^0000ffaccount^000000 set Start:^0000ffaccount^000000 set Step")) {
+			case 1: // close dialogue
+				.@keepdialogue = 0;
+				break;
+			case 2:
+				donpcevent "init_xmas::OnEnable";
+				clear;
+				mes "Event enabled";
+				mes "Check the day setting!";
+				mes " ";
+				mes "^ff0000Be aware:^000000 every hour at [xx:01] it will enable/disable automatically.";
+				break;
+			case 3:
+				donpcevent "init_xmas::OnDisable";
+				clear;
+				mes "Event disabled";
+				mes "Check the day setting!";
+				mes " ";
+				mes "^ff0000Be aware:^000000 every hour at [xx:01] it will enable/disable automatically.";
+				break;
+				end;
+			case 4:
+				clear;
+				mes "What day to set? (1-31)";
+				input .@x;
+				if (.@x > 0 && .@x <= 31) {
+					$xmas_day_of_december = .@x;
+					mes "Day set to "+$xmas_day_of_december;
+				}
+				else {
+					mes "unchanged";
+				}
+				break;
+			case 5:
+				#opened_calendar_door = 0;
+				#current_calendar_door = 0;
+				#advent_calendar_start = 0;
+				#advent_calendar_step = 0;
+				clear;
+				mes "Quest completely reset";
+				end;
+			case 6:
+				clear;
+				mes "What box number? (1-24)";
+				input .@x;
+				if (.@x > 0 && .@x <= 24) {
+					#opened_calendar_door = .@x;
+					mes "Box set to "+#opened_calendar_door;
+				}
+				else {
+					mes "unchanged";
+				}
+				end;
+			case 7:
+				clear;
+				mes "What hint number? (1-72)";
+				mes " ";
+				mes "hint ~= day * 3";
+				mes " ";
+				mes "hint 1-3 = day 1, hint 4-6 = day 2";
+				mes "...";
+				mes "hint 70-72 = day 24";
+				input .@x;
+				if (.@x > 0 && .@x <= 72) {
+					#current_calendar_door = .@x;
+					.@calendary_day = (((#current_calendar_door-1) / 3)+1);
+					.@keyword_number = ((#current_calendar_door-1) % 3 +1);
+					mes "Hint set to "+#current_calendar_door+" (day "+.@calendary_day+" word "+.@keyword_number+")";
+				}
+				else {
+					mes "unchanged";
+				}
+				break;
+			case 8:
+			//#advent_calendar_start = rand(0,82);
+			//#advent_calendar_step = rand(3,80);
+				clear;
+				mes "Start where? (1-82)";
+				input .@x;
+				if (.@x > 0 && .@x <= 82) {
+					#advent_calendar_start = .@x;
+					mes "Start set to "+#advent_calendar_start;
+				}
+				else {
+					mes "unchanged";
+				}
+				end;
+			case 9:
+				clear;
+				mes "What step size? (3-80)";
+				input .@x;
+				if (.@x > 2 && .@x <= 80) {
+					#advent_calendar_step = .@x;
+					mes "Box set to "+#advent_calendar_step;
+				}
+				else {
+					mes "unchanged";
+				}
+				end;
+		}
+		if (.@keepdialogue == 1) {
+			next;
+		}
+	}
+	close;
+}
+prontera,155,203,4	script	Christmas Tree	-1,6,6,{
+	if ($xmas_calendar_active == 0) {
+		end;
+	}
+	mes "[Christmas Tree]";
+	mes "There are boxes with strange locks and the numbers ^007fff1 - 24^000000 are written on them.";
+	mes " ";
+	mes "This seems to be an advent calendar!";
+	next;
+	if (BaseLevel < $xmas_minimum_baselevel) {
+		mes "[Christmas Tree]";
+		mes " ";
+		mes "Sadly all boxes are so far away, you cannot reach them.";
+		mes " ";
+		mes "Maybe you should come back when you are ^0000ffbase level "+$xmas_minimum_baselevel+"^000000!";
+		close;
+	}
+	// we did talk to Santa Clues, and might know what it
+	if (#current_calendar_door > 0) {
+		mes "[Christmas Tree]";
+		// we are advancing in days, and have unopened boxes
+		if (#opened_calendar_door < $xmas_day_of_december && #opened_calendar_door < 24) {
+			if (#opened_calendar_door == 0) {
+				mes "You should start with your first box.";
+				mes " ";
+				mes "Do you want to open the lock?";
+			}
+			else if (#opened_calendar_door == 1) {
+				mes "The first box is already opened.";
+				mes " ";
+				mes "Do you want to open box "+(#opened_calendar_door+1)+"?";
+			}
+			else {
+				mes "Boxes 1 to "+#opened_calendar_door+" are already open.";
+				mes " ";
+				mes "Do you want to try to open box "+(#opened_calendar_door+1)+" now?";
+			}
+			
+			switch (select("No, just enjoy the tree","Yes, give it a try!")) {
+				case 1:
+					specialeffect2 getRandEffect();
+					break;
+				case 2:
+					.@word1index = getCalendarIndex(#opened_calendar_door * 3 + 1);
+					.@word2index = getCalendarIndex(#opened_calendar_door * 3 + 2);
+					.@word3index = getCalendarIndex(#opened_calendar_door * 3 + 3);
+					.@word1$ = $@door_hints$[.@word1index];
+					.@word2$ = $@door_hints$[.@word2index];
+					.@word3$ = $@door_hints$[.@word3index];
+					for (.@menu_index = 0; .@menu_index < 5; .@menu_index += 1) {
+						.@pseudo1 = getCalendarIndex(.@word1index + .@menu_index);
+						.@pseudo2 = getCalendarIndex(.@word1index + .@menu_index);
+						.@pseudo3 = getCalendarIndex(.@word1index + .@menu_index);
+						// first menu
+						if (.@word1index % 5 == .@menu_index) {
+							.@word1menu$[.@menu_index] = .@word1$;
+						}
+						else {
+							if (.@pseudo1 != .@word1index) { // 9 out of 10 all pseudo words are different
+								.@word1menu$[.@menu_index] = $@door_hints$[.@pseudo1];
+							}
+							else { // but 1 out of 10, actually 1 of the 4 words is the same as the real word. fxk you math, fxk you collisions.
+								.@word1menu$[.@menu_index] = $@badwords$[.@menu_index % 5];
+							}
+						}
+						// second menu
+						if (.@word2index % 5 == .@menu_index) {
+							.@word2menu$[.@menu_index] = .@word2$;
+						}
+						else {
+							if (.@pseudo2 != .@word2index) { // 9 out of 10 all pseudo words are different
+								.@word2menu$[.@menu_index] = $@door_hints$[.@pseudo2];
+							}
+							else {
+								.@word2menu$[.@menu_index] = $@badwords$[.@menu_index % 5];
+							}
+						}
+						// third menu
+						if (.@word3index % 5 == .@menu_index) {
+							.@word3menu$[.@menu_index] = .@word3$;
+						}
+						else {
+							if (.@pseudo3 != .@word3index) { // 9 out of 10 all pseudo words are different
+								.@word3menu$[.@menu_index] = $@door_hints$[.@pseudo3];
+							}
+							else {
+								.@word3menu$[.@menu_index] = $@badwords$[.@menu_index % 5];
+							}
+						}
+					}
+					clear;
+					mes "[Advent Lock]";
+					mes "What is the first word?";
+					.@select1 = select(.@word1menu$[ 0],.@word1menu$[ 1],.@word1menu$[ 2],.@word1menu$[ 3],.@word1menu$[ 4]);
+					specialeffect2 getRandEffect();
+					clear;
+					mes "[Advent Lock]";
+					mes "The second word?";
+					.@select2 = select(.@word2menu$[ 0],.@word2menu$[ 1],.@word2menu$[ 2],.@word2menu$[ 3],.@word2menu$[ 4]);
+					specialeffect2 getRandEffect();
+					clear;
+					mes "[Advent Lock]";
+					mes "And the last one?";
+					.@select3 = select(.@word3menu$[ 0],.@word3menu$[ 1],.@word3menu$[ 2],.@word3menu$[ 3],.@word3menu$[ 4]);
+					specialeffect2 getRandEffect();
+					clear;
+					mes "[Advent Lock]";
+					mes "You entered ^0000ff"+.@word1menu$[.@select1 -1]+" "+.@word2menu$[.@select2 -1]+" "+.@word3menu$[.@select3 -1]+" ";
+					if (.@select1 -1 == .@word1index % 5 && .@select2 -1 == .@word2index % 5 && .@select3 -1 == .@word3index % 5) {
+						mes " ";
+						mes "The lock does a click and opens";
+						next;
+						.@reward = $@xmas_rewards[#opened_calendar_door * 2 ];
+						.@rewardamount = $@xmas_rewards[#opened_calendar_door * 2 + 1];
+						mes "[Advent Calendar Box]";
+						if (.@rewardamount == 1) {
+							mes "Look!";
+							mes " ";
+							mes "In that box is a ";
+							mes "^007fff"+getitemname(.@reward)+"^000000!";
+						}
+						else {
+							mes "Wow!";
+							mes " ";
+							mes "There are ";
+							mes "^007fff"+.@rewardamount+"x "+getitemname(.@reward)+"^000000";
+							mes "in it!";
+						}
+						if (checkweight(.@reward,.@rewardamount)) {
+							specialeffect2 68;
+							#opened_calendar_door += 1;
+							getitem .@reward,.@rewardamount;
+							logmes strcharinfo(0) + " opened advent calendar box " + #opened_calendar_door + " and received " + .@rewardamount + " "+getitemname(.@reward)+" ("+.@reward+")";
+						}
+						else {
+							mes " ";
+							mes "Sadly you can not carry that.";
+							mes "^ff0000Clear up some space^000000 and reopen the box again.";
+						}
+						close;
+					}
+					else {
+						mes " ";
+						mes "The lock rattles, but does not open.";
+					}
+					break;
+			}
+		}
+		else if ($xmas_day_of_december < 24) {
+			mes "You already opened Boxes 1 to "+#opened_calendar_door+" .";
+			mes " ";
+			mes "You can open the next box tomorrow.";
+		}
+		else {
+			mes "You already opened all your advent calendar boxes.";
+			mes " ";
+			mes "But you remember the fun solving the riddles";
+		}
+	}
+	else {
+		mes "[Christmas Tree]";
+		mes " ";
+		mes "Maybe you should learn how to open the boxes!";
+	}
+	close;
+}
+
+
+prontera,156,115,4	script	Santa Clues	-1,{
+	if (BaseLevel < $xmas_minimum_baselevel) {
+		mes "[^007fffSanta Clues^000000]";
+		mes "Hello Kid!";
+		mes " ";
+		mes "I would ^ff0000love^000000 to let you participate in our christmas event.";
+		next;
+		mes "[^007fffSanta Clues^000000]";
+		mes "But due to ^ff0000safety regulations^000000 you must be";
+		mes "at least ^0000ffbase level "+$xmas_minimum_baselevel+"^000000 or above!";
+		mes " ";
+		mes "I am sorry~";
+		next;
+		mes "[^007fffSanta Clues^000000]";
+		mes "Come back when you reach ";
+		mes "^0000ffbase level "+$xmas_minimum_baselevel+"^000000";
+		mes " ";
+		mes "I will wait for you until new year!";
+		close;
+	}
+	if (#current_calendar_door == 0 && #opened_calendar_door == 0) {
+		mes "[^007fffSanta Clues^000000]";
+		mes "Do you like Advent Calendars?";
+		switch (select("Not my cup of tea","Yes, I like them very much!")) {
+			case 1:
+				mes " ";
+				mes "Sad to hear that.";
+				mes "Come back if you change your mind!";
+				close;
+				break;
+			case 2:
+				break;
+		}
+		clear;
+		mes "[^007fffSanta Clues^000000]";
+		mes "Great!","Me and the other Santas have prepared an ^0000ffAdvent Calendar^000000 scavenger hunt!";
+		mes " ";
+		mes "  ..do you like ^ff0000scavenger hunts^000000?";
+		switch (select("No, I hate running around.", "Yeah, I love questing and doing stuff!")) {
+			case 2:
+				clear;
+				callsub Explain_Calendar;
+				next;
+				break;
+			case 1:
+			clear;
+				mes "[^007fffSanta Clues^000000]";
+				mes "I see.","Well, then this is not for you.";
+				mes "But in case you change your opinion, come back to me!";
+				close;
+				break;
+		}
+		mes "[^007fffSanta Clues^000000]";
+		mes "Okay, here comes the first hint for your scavenger hunt!";
+		mes " ";
+		mes "You need a <ITEM>"+getitemname($xmas_quest_hat)+"<INFO>"+$xmas_quest_hat+"</INFO></ITEM> to talk with my helpers!";
+		close2;
+		#current_calendar_door = 1;
+		#opened_calendar_door = 0;
+		#advent_calendar_start = rand(0,82);
+		#advent_calendar_step = rand(3,80);
+		logmes strcharinfo(0) + " started advent calendar with [start "+#advent_calendar_start+"] and [step "+#advent_calendar_step+"] ";
+		.@calendar_index = getCalendarIndex(#current_calendar_door);
+		viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
+		// Increase AGI Level 5
+		sc_start SC_INCREASEAGI,140000,5;
+		skilleffect 29,0;
+		end;
+	}
+	else {
+		// 1,2,3 = 1; 4,5,6 = 2; 7,8,9 = 3;
+		//
+		.@calendar_index = getCalendarIndex(#current_calendar_door);
+		.@calendary_day = (((#current_calendar_door-1) / 3)+1);
+		.@keyword_number = ((#current_calendar_door-1) % 3 +1);
+		if (getequipid(EQI_HEAD_TOP) == $xmas_quest_hat) { // Default: Santa Hat
+			.@wears_a_hat = 1;
+			.@option1$ = "Yes!";
+			.@option2$ = "No, I need a hint!";
+		}
+		else {
+			.@wears_a_hat = 0;
+			.@option1$ = "But I have one!";
+			.@option2$ = ".. can you give me a "+getitemname($xmas_quest_hat)+"?";
+		}
+		if (.@calendary_day > 24) {
+			mes "[^007fffSanta Clues^000000]";
+			mes "You have found all keywords!";
+			mes " ";
+			if (#opened_calendar_door < 24) {
+				mes "But if you still need some to open your boxes, I can help you.";
+			}
+			else {
+				mes "You may collect all keywords again if you want?";
+			}
+			.@option1$ = "No thank you";
+			.@option2$ = "I want to start over!";
+		}
+		else {
+			if (.@wears_a_hat == 1 && #opened_calendar_door + 1 < .@calendary_day) {
+				if (#opened_calendar_door > 0) {
+					mes "[^007fffSanta Clues^000000]";
+					mes "Until now you only opened your calendar boxes up to ^0000ffday "+#opened_calendar_door+"^000000!";
+					mes " ";
+					mes "You will need the correct ^ff0000keywords^000000 for ^0000ffday "+(#opened_calendar_door+1)+"^000000 to open the next one!";
+					next;
+				}
+				else {
+					mes "[^007fffSanta Clues^000000]";
+					mes "You did not open any reward boxes yet!";
+					mes " ";
+					mes "I hope you remember the correct ^ff0000keywords^000000 to open the box?";
+					mes "Go to the ^0000ffChristmas Tree^000000 in the center of Prontera and claim your reward!";
+					next;
+				}
+			
+			}
+			mes "[^007fffSanta Clues^000000]";
+			mes "You are currently hunting";
+			mes "the ^ff007fkeyword number "+.@keyword_number+"^000000 of ^0000ffday "+.@calendary_day+"^000000";
+			mes " ";
+			if (.@wears_a_hat == 0) {
+				mes "It seems you are not wearing a ^ff0000"+getitemname($xmas_quest_hat)+"^000000";
+			}
+			else {
+				if (#opened_calendar_door >= .@calendary_day) {
+					mes "Mind you, ^0000ffbox "+.@calendary_day+"^000000 is already open!";
+					mes " ";
+				}
+				mes "Do you know the keyword?";
+			}
+		}
+		switch (select(.@option1$,.@option2$,"How does this work?","Can I start at another day?")) {
+			case 1: // no hat: how to get one. hat and day > 24: "I need no further help"
+				// last calendar day: "No thanks" option
+				if (.@calendary_day > 24) {
+					clear;
+					mes "[^007fffSanta Clues^000000]";
+					mes "Okay, good luck and merry christmas!";
+					close;
+				}
+				// no santa hat on top:
+				if (.@wears_a_hat == 0) {
+					clear;
+					mes "[^007fffSanta Clues^000000]";
+					mes "Well, time to put it on then!";
+					mes " ";
+					mes "My helpers wont talk to someone who is not in christmas mood!";
+					close;
+				}
+				// santa hat and not the last day.
+				mes "What is it??";
+				input .@keyword$;
+				.@keyword$ = strtoupper(.@keyword$);
+				clear;
+				if ($@door_hints$[.@calendar_index] == .@keyword$) {
+					#current_calendar_door += 1;
+					mes "[^007fffSanta Clues^000000]";
+					// we reached a new day! 4, 7 and so on are first of their day.
+					if ( (#current_calendar_door) % 3 == 1) {
+						if (#opened_calendar_door < .@calendary_day) {
+							if (.@calendary_day == 24) { 
+								mes "Yes the last keyword is ^0000ff"+.@keyword$+"^000000!";
+								mes " ";
+								mes "This will allow you to open your ^0000fffinal Advent Calendar box^000000!";
+								mes " ";
+								mes "Merry Christmas!";
+								close;
+							}
+							else {
+								mes "^0000ff"+.@keyword$+"^000000 is the word!";
+								mes " ";
+								mes "You now should know the combination for your ^0000ffday "+.@calendary_day+" box^000000!";
+								close;
+							}
+						}
+						else {
+							if (#opened_calendar_door == 24) {
+								mes "Hohoho, you seem to enjoy the event!";
+								mes " ";
+								mes "You found all the keywords and got your rewards.";
+								mes " ";
+								mes " ~ Merry Christmas!";
+								close;
+							}
+							mes "Yes, ^0000ff"+.@keyword$+"^000000 it is.";
+							if (.@calendary_day >= $xmas_day_of_december) {
+								mes " ";
+								mes "You will get the next hint tomorrow.";
+								close;
+							}
+						}
+						next;
+						mes "[^007fffSanta Clues^000000]";
+						mes "You've already opened box ^0000ff"+.@calendary_day+"^000000";
+						mes " ";
+						.@calendar_index = getCalendarIndex(#current_calendar_door);
+						.@calendary_day = (((#current_calendar_door-1) / 3)+1);
+						mes "So, this is the ^ff007ffirst^000000 hint for ^0000ffday "+.@calendary_day+"^000000";
+						viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
+						// Increase AGI Level 5
+						sc_start SC_INCREASEAGI,140000,5;
+						skilleffect 29,0;
+					}
+					else {
+						mes "You are right, ^0000ff"+.@keyword$+"^000000 is correct!";
+						mes " ";
+						mes "Here is the hint for ";
+						mes "keyword ^ff007f"+(.@keyword_number+1)+"^000000 of day ^0000ff"+.@calendary_day+"^000000";
+						close2;
+						.@calendar_index = getCalendarIndex(#current_calendar_door);
+						viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
+						// Increase AGI Level 5
+						sc_start SC_INCREASEAGI,140000,5;
+						skilleffect 29,0;
+					}
+				}
+				else {
+					mes "[^007fffSanta Clues^000000]";
+					mes "Sorry, no.";
+					mes " ";
+					mes "^ff0000"+.@keyword$+"^000000";
+					mes " ";
+					mes "seems not to be ","the ^ff007fkeyword "+.@keyword_number+"^000000 of ^0000ffday "+.@calendary_day+"^000000";
+					close;
+				}
+				break;
+			case 2:
+				clear;
+				// last day, player wants to repeat at day 1. (no rewards, just repeat getting keywords. same as asking to switch to day 1)
+				if (.@calendary_day > 24) {
+					mes "[^007fffSanta Clues^000000]";
+					mes "Okay, we will start again on day 1";
+					mes " ";
+					if (#opened_calendar_door == 24) {
+						mes "^ff0000You cannot open your boxes again^000000, they are empty.";
+					}
+					#current_calendar_door = 1; // start at first keyword of first day
+					close;
+				}
+				// no santa hat, player wants to trade in
+				if (.@wears_a_hat == 0) {
+					clear;
+					if (countitem(507) < 5 || countitem(938) < 5 || countitem(914) < 20) {
+						if (countitem(10019) > 0) {
+							mes "[^007fffSanta Clues^000000]";
+							mes "Oh you already have some weird piece of red fabric!";
+							mes " ";
+							mes "Let me help you with ";
+							mes "^007fffSOME CHRISTMAS MAGIC^000000";
+							mes "on that!";
+							next;
+							callsub Build_Santa_Hat;
+							close;
+						}
+						callsub Explain_Santa_Hat;
+						close;
+					}
+					else {
+						mes "[^007fffSanta Clues^000000]";
+						mes "Ohoho!";
+						mes "Okay, lets start! Grind the herbs!";
+						while (select("mix the herbs around","grind the red herbs carefully","clap your hands in excitement") != 2 ) {
+							progressbar "007FFF",1;
+						}
+						progressbar "007FFF",1;
+						clear;
+						mes "[^007fffSanta Clues^000000]";
+						mes "^ff0000Close enough!^000000";
+						mes "Now weave a fabric from the Fluffs!";
+						while (select("mush fluff together","weave some fluff-fabric","taste the red herb powder") != 2) {
+							progressbar "007FFF",1;
+						}
+						progressbar "007FFF",1;
+						clear;
+						mes "[^007fffSanta Clues^000000]";
+						mes "^00A000Haha well!^000000";
+						mes "Now colour the fabric with red herb powder";
+						while (select("sticky your finger into mucus","fill red herb powder into fabric-bag","sprinkle red herb powder over the fabric") != 3) {
+							progressbar "007FFF",1;
+						}
+						progressbar "007FFF",1;
+						clear;
+						mes "[^007fffSanta Clues^000000]";
+						mes "^007fffThat should work.^000000";
+						mes "Now glue everything together with Sticky Mucus";
+						select("swirl the fluff and stretch the sticky mucus","press red fabric onto sticky mucus","~~fiddle it together ^ff0000~~somehow^000000");
+						progressbar "007FFF",3;
+						specialeffect2 155;
+						delitem 507,5; // Red Herb
+						delitem 938,5; // Sticky Mucus
+						delitem 914,20; // Fluff
+						getitem 10019,1; // +1 Red Scarf lulz
+						clear;
+						mes "[^007fffSanta Clues^000000]";
+						mes " ";
+						mes "... oh, ehm ... well";
+						next;
+						mes "[^007fffSanta Clues^000000]";
+						mes " ";
+						mes "Let me help you with ";
+						mes "^007fffSOME CHRISTMAS MAGIC^000000";
+						mes "on that!";
+						next;
+						callsub Build_Santa_Hat;
+						close;
+					}
+				}
+				mes "[^007fffSanta Clues^000000]";
+				mes "Hohoho, it is hard to guess, right?";
+				if (.@calendary_day > $xmas_day_of_december) {
+					mes " ";
+					mes "But you will have to wait!";
+					mes " ";
+					mes "Ask me tomorrow for the next hint.";
+					close;
+				}
+				mes " ";
+				mes "I give you a hint where to ask!";
+				mes " ";
+				mes " ~ check your ^ff0000mini map^000000";
+				close2;
+				viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
+				break;
+			case 3: // How does it work?
+				clear;
+				callsub Explain_Calendar;
+				break;
+			case 4:
+				clear;
+				mes "[^007fffSanta Clues^000000]";
+				mes "Of course.";
+				mes " ";
+				mes "I also have problems memorizing the codewords!";
+				mes " ";
+				mes "Which day do you want to repeat?";
+				input .@day2repeat;
+				clear;
+				if (.@day2repeat == 0) {
+					mes "[^007fffSanta Clues^000000]";
+					mes "Okay, we stick to your day "+.@calendary_day;
+					mes " ";
+					mes "Come back if you need help!";
+					close;
+				}			
+				if (.@day2repeat > $xmas_day_of_december && .@day2repeat <= 24) {
+					mes "[^007fffSanta Clues^000000]";
+					mes "Hohoho! Nice try!";
+					mes " ";
+					mes "I am sorry, I will only tell you hints for the days up to "+$xmas_day_of_december;
+					close;
+				}
+				if (.@day2repeat > 24) {
+					mes "[^007fffSanta Clues^000000]";
+					mes "This is an advent calendar scavenger hunt!";
+					mes " ";
+					mes "You can only get rewards for the days ^007fff1 to 24^000000";
+					close;
+				}
+				#current_calendar_door = (.@day2repeat -1) * 3 +1;
+				.@calendar_index = getCalendarIndex(#current_calendar_door);
+				.@calendary_day = ((#current_calendar_door / 3)+1);
+				.@keyword_number = ((#current_calendar_door-1) % 3 +1);
+				mes "[^007fffSanta Clues^000000]";
+				mes "Okay, you can now start to hunt ";
+				mes "keyword ^ff007f"+.@keyword_number+"^000000 of day ^0000ff"+.@calendary_day+"^000000";
+				mes " ";
+				if (.@calendary_day != #current_calendar_door) {
+					mes "^ff0000Be aware^000000, you still have to open the boxes in ^ff0000correct order!^000000";
+				}
+				mes "Good luck!";
+				viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
+				// Increase AGI Level 5
+				sc_start SC_INCREASEAGI,140000,5;
+				skilleffect 29,0;
+				close;
+				break;
+				
+		}
+	}
+	end;
+Build_Santa_Hat:
+	if (countitem(10019) > 0) {
+		mes "[^007fffSanta Clues^000000]";
+		mes "1 ...";
+		progressbar "007FFF",1;
+		mes "... 2 ...";
+		progressbar "007FFF",1;
+		mes "      ... 3";
+		progressbar "007FFF",1;
+		clear;
+		mes "[^007fffSanta Clues^000000]";
+		specialeffect2 154;
+		mes "Here you go!";
+		mes " ";
+		mes "Remember to wear it when talking to me, or when hunting for keywords!";
+		delitem 10019,1; // -1 Red Scarf (Smokie Accessory)
+		getitem $xmas_quest_hat,1; // +1 Santa Hat
+	}
+	return;
+Explain_Calendar:
+	mes "[^007fffSanta Clues^000000]";
+	mes "For each day you have to collect ^ff0000three secret keywords^000000.";
+	mes " ";
+	mes	"These are only known to my helpers which are scattered in the houses in town.";
+	next;
+	mes "[^007fffSanta Clues^000000]";
+	mes "You need to find their ^0000ffdoors^000000 and knock on them.";
+	mes " ";
+	mes "Also wear a <ITEM>"+getitemname($xmas_quest_hat)+"<INFO>"+$xmas_quest_hat+"</INFO></ITEM> to show that you are in christmas mood!";
+	next;
+	mes "[^007fffSanta Clues^000000]";
+	mes "I can tell you where to go.";
+	mes "But I will only give you further hints if you tell me the previous keywords!";
+	next;
+	mes "[^007fffSanta Clues^000000]";
+	mes "The ^ff00003^000000 keywords of ^ff0000each day^000000 can be used to open a box on the Christmas Tree.";
+	next;
+	mes "[^007fffSanta Clues^000000]";
+	mes "So make sure that you memorize the words and their order!";
+	return;
+Explain_Santa_Hat:
+	mes "[^007fffSanta Clues^000000]";
+	mes "I can craft one <ITEM>"+getitemname($xmas_quest_hat)+"<INFO>"+$xmas_quest_hat+"</INFO></ITEM> if you bring me the following ingredients:";
+	mes "  20x <ITEM>Fluff<INFO>914</INFO></ITEM>";
+	mes "  5x <ITEM>Sticky Mucus<INFO>938</INFO></ITEM>";
+	mes "  5x <ITEM>Red Herbs<INFO>507</INFO></ITEM>";
+	return;
+}
+
+-	script	random_house_door	-1,{
+OnTouch:
+	if ($xmas_calendar_active == 0) {
+		end;
+	}
+	if (BaseLevel < $xmas_minimum_baselevel) {
+		end;
+	}
+	.@doorcount = getarraysize($@door_coordinates) / 2; // should be a prime.
+	.@hintcount = getarraysize($@door_hints$); // should be the same prime.
+	if (.@doorcount != .@hintcount) {
+		// basically die in a fire.
+		end;
+	}
+	.@calendar_index =  getCalendarIndex(#current_calendar_door);
+	.@calendary_day = (((#current_calendar_door-1) / 3)+1);
+	.@wears_a_hat = 0;
+	getmapxy(.map$, .x, .y, 1);
+	.@doorx = $@door_coordinates[.@calendar_index * 2];
+	.@doory = $@door_coordinates[.@calendar_index * 2 +1];
+	// if in range of the proper door, we are happy
+	if (.x < .@doorx + 3 && .x > .@doorx - 3 && .y < .@doory + 3 && .y > .@doory -3) {
+		if (getequipid(EQI_HEAD_TOP) == 2236) { // Santa Hat
+			.@wears_a_hat = 1;
+		}
+		mes "[Santas Helper]";
+		if (.@wears_a_hat == 0) {
+			mes "Go away!";
+			mes " ";
+			mes "I do not talk to random people!";
+			next;
+			mes " ";
+			mes "^777777This seems to be the door Santa Clues told you.";
+			mes " ";
+			mes "But you seem to miss something, you should talk to Santa Clues again.";
+			close;
+		}
+		if (.@calendary_day > $xmas_day_of_december) {
+			mes "You are fast!";
+			mes " ";
+			mes "But you have to wait ^ff0000until tomorrow^000000 to get the next word!";
+			close;
+		}
+		switch (rand(1,6)) {
+			case 1:
+				mes "I was expecting you!";
+				mes "Your next codeword is";
+				mes "^0000FF"+$@door_hints$[.@calendar_index]+"^000000";
+				mes " ";
+				mes "Go back to Santa Clues!";
+				break;
+			case 2:
+				mes "Hello youngster!";
+				mes "You want to know the word aye?";
+				mes " ";
+				mes "It is ^0000FF"+$@door_hints$[.@calendar_index]+"^000000";
+				break;
+			case 3:
+				mes "Santa sent you?";
+				mes " ";
+				mes "Okay then, your next word is";
+				mes "^0000FF"+$@door_hints$[.@calendar_index]+"^000000";
+				break;
+			case 4:
+				mes "Welcome!";
+				mes " ";
+				mes "Looking for todays keyword?";
+				mes "Today it is ^0000FF"+$@door_hints$[.@calendar_index]+"^000000 !";
+				break;
+			case 5:
+				mes "Hehehe!";
+				mes "You might want to know that ";
+				mes "^0000FF"+$@door_hints$[.@calendar_index]+"^000000 is what you're looking for!!";
+				mes " ";
+				mes "Hurry, tell Santa Clues that I did good!";
+				break;
+			case 6:
+				mes "Hi there!";
+				mes "If you want to know the code, it is ";
+				mes "^0000FF"+$@door_hints$[.@calendar_index]+"^000000 for today!";
+				mes " ";
+				mes "Have fun!";
+				break;
+		}
+		close;
+	}
+	end;
+}
+
+
+prontera,219,181,1	duplicate(random_house_door)	Door#1	-1,2,2
+prontera,224,160,1	duplicate(random_house_door)	Door#2	-1,2,2
+prontera,184,158,1	duplicate(random_house_door)	Door#3	-1,2,2
+prontera,269,219,1	duplicate(random_house_door)	Door#4	-1,2,2
+prontera,280,236,1	duplicate(random_house_door)	Door#5	-1,2,2
+prontera,273,257,1	duplicate(random_house_door)	Door#6	-1,2,2
+prontera,269,275,1	duplicate(random_house_door)	Door#7	-1,2,2
+prontera,239,267,1	duplicate(random_house_door)	Door#8	-1,2,2
+prontera,227,283,1	duplicate(random_house_door)	Door#9	-1,2,2
+prontera,186,248,1	duplicate(random_house_door)	Door#10	-1,2,2
+prontera,210,265,1	duplicate(random_house_door)	Door#11	-1,2,2
+prontera,215,247,1	duplicate(random_house_door)	Door#12	-1,2,2
+prontera,219,227,1	duplicate(random_house_door)	Door#13	-1,2,2
+prontera,204,216,1	duplicate(random_house_door)	Door#14	-1,2,2
+prontera,125,251,1	duplicate(random_house_door)	Door#15	-1,2,2
+prontera,102,265,1	duplicate(random_house_door)	Door#16	-1,2,2
+prontera,96,255,1	duplicate(random_house_door)	Door#17	-1,2,2
+prontera,84,248,1	duplicate(random_house_door)	Door#18	-1,2,2
+prontera,95,223,1	duplicate(random_house_door)	Door#19	-1,2,2
+prontera,107,191,1	duplicate(random_house_door)	Door#20	-1,2,2
+prontera,92,184,1	duplicate(random_house_door)	Door#21	-1,2,2
+prontera,94,167,1	duplicate(random_house_door)	Door#22	-1,2,2
+prontera,94,158,1	duplicate(random_house_door)	Door#23	-1,2,2
+prontera,100,149,1	duplicate(random_house_door)	Door#24	-1,2,2
+prontera,108,144,1	duplicate(random_house_door)	Door#25	-1,2,2
+prontera,122,144,1	duplicate(random_house_door)	Door#26	-1,2,2
+prontera,139,150,1	duplicate(random_house_door)	Door#27	-1,2,2
+prontera,105,167,1	duplicate(random_house_door)	Door#28	-1,2,2
+prontera,114,179,1	duplicate(random_house_door)	Door#29	-1,2,2
+prontera,165,167,1	duplicate(random_house_door)	Door#30	-1,2,2
+prontera,183,144,1	duplicate(random_house_door)	Door#31	-1,2,2
+prontera,183,130,1	duplicate(random_house_door)	Door#32	-1,2,2
+prontera,98,74,1	duplicate(random_house_door)	Door#33	-1,2,2
+prontera,91,45,1	duplicate(random_house_door)	Door#34	-1,2,2
+prontera,119,40,1	duplicate(random_house_door)	Door#35	-1,2,2
+prontera,164,41,1	duplicate(random_house_door)	Door#36	-1,2,2
+prontera,167,83,1	duplicate(random_house_door)	Door#37	-1,2,2
+prontera,165,100,1	duplicate(random_house_door)	Door#38	-1,2,2
+prontera,184,108,1	duplicate(random_house_door)	Door#39	-1,2,2
+prontera,200,98,1	duplicate(random_house_door)	Door#40	-1,2,2
+prontera,216,100,1	duplicate(random_house_door)	Door#41	-1,2,2
+prontera,208,73,1	duplicate(random_house_door)	Door#42	-1,2,2
+prontera,197,57,1	duplicate(random_house_door)	Door#43	-1,2,2
+prontera,180,77,1	duplicate(random_house_door)	Door#44	-1,2,2
+prontera,188,48,1	duplicate(random_house_door)	Door#45	-1,2,2
+prontera,205,28,1	duplicate(random_house_door)	Door#46	-1,2,2
+prontera,219,40,1	duplicate(random_house_door)	Door#47	-1,2,2
+prontera,256,40,1	duplicate(random_house_door)	Door#48	-1,2,2
+prontera,271,42,1	duplicate(random_house_door)	Door#49	-1,2,2
+prontera,272,78,1	duplicate(random_house_door)	Door#50	-1,2,2
+prontera,273,96,1	duplicate(random_house_door)	Door#51	-1,2,2
+prontera,257,102,1	duplicate(random_house_door)	Door#52	-1,2,2
+prontera,256,123,1	duplicate(random_house_door)	Door#53	-1,2,2
+prontera,271,127,1	duplicate(random_house_door)	Door#54	-1,2,2
+prontera,241,142,1	duplicate(random_house_door)	Door#55	-1,2,2
+prontera,221,116,1	duplicate(random_house_door)	Door#56	-1,2,2
+prontera,235,108,1	duplicate(random_house_door)	Door#57	-1,2,2
+prontera,256,192,1	duplicate(random_house_door)	Door#58	-1,2,2
+prontera,279,195,1	duplicate(random_house_door)	Door#59	-1,2,2
+prontera,272,187,1	duplicate(random_house_door)	Door#60	-1,2,2
+prontera,269,160,1	duplicate(random_house_door)	Door#61	-1,2,2
+prontera,68,142,1	duplicate(random_house_door)	Door#62	-1,2,2
+prontera,86,125,1	duplicate(random_house_door)	Door#63	-1,2,2
+prontera,79,67,1	duplicate(random_house_door)	Door#64	-1,2,2
+prontera,71,37,1	duplicate(random_house_door)	Door#65	-1,2,2
+prontera,60,42,1	duplicate(random_house_door)	Door#66	-1,2,2
+prontera,41,44,1	duplicate(random_house_door)	Door#67	-1,2,2
+prontera,40,117,1	duplicate(random_house_door)	Door#68	-1,2,2
+prontera,38,134,1	duplicate(random_house_door)	Door#69	-1,2,2
+prontera,52,90,1	duplicate(random_house_door)	Door#70	-1,2,2
+prontera,58,157,1	duplicate(random_house_door)	Door#71	-1,2,2
+prontera,37,169,1	duplicate(random_house_door)	Door#72	-1,2,2
+prontera,33,156,1	duplicate(random_house_door)	Door#73	-1,2,2
+prontera,40,181,1	duplicate(random_house_door)	Door#74	-1,2,2
+prontera,36,226,1	duplicate(random_house_door)	Door#75	-1,2,2
+prontera,50,227,1	duplicate(random_house_door)	Door#76	-1,2,2
+prontera,58,249,1	duplicate(random_house_door)	Door#77	-1,2,2
+prontera,42,267,1	duplicate(random_house_door)	Door#78	-1,2,2
+prontera,40,279,1	duplicate(random_house_door)	Door#79	-1,2,2
+prontera,49,293,1	duplicate(random_house_door)	Door#80	-1,2,2
+prontera,57,294,1	duplicate(random_house_door)	Door#81	-1,2,2
+prontera,74,270,1	duplicate(random_house_door)	Door#82	-1,2,2
+prontera,71,284,1	duplicate(random_house_door)	Door#83	-1,2,2
+prontera,89,334,1	duplicate(random_house_door)	Door#84	-1,2,2
