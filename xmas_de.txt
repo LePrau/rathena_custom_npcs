@@ -68,6 +68,22 @@ OnEnable:
 	enablenpc "Santa Clues";
 	setnpcdisplay "Weihnachtsbaum",723; //= EINSTELLUNG: großer Schatten-Sprite unter dem Weihnachtsbaum in Prontera
 	enablenpc "Weihnachtsbaum";
+
+    //= EINSTELLUNG: Position des Weihachtsbaums:
+    // "prontera", 155, 203 = Baum in Prontera an Stelle des Brunnens
+    // "xmas", 147, 142 = Baum in Lutie
+    unitwarp getnpcid(0,"Weihnachtsbaum"), "xmas", 147, 142;
+
+    //= EINSTELLUNG: Navi-Link zum Weihnachtsbaum - !muss eine begehbare Zelle sein!
+    // <INFO>xmas,147,138,0,101,0</INFO> = xmas,147,138
+    $xmas_navi$ = "<NAVI>Weihnachtsbaum<INFO>xmas,147,138,0,101,0</INFO></NAVI>";
+
+    //= EINSTELLUNG: Position vom Santa Clues NPC
+    // muss in Prontera stehen, da sonst die Schnitzeljagd mit den Türen keinen Sinn macht
+    // "prontera", 156, 115 = untere Kreuzung
+    // "prontera", 156, 282 = oben an der Hand-Statue
+    unitwarp getnpcid(0,"Santa Clues"), "prontera", 156, 282;
+
 	end;
 OnDisable:
 	$xmas_calendar_active = 0; // disabling all door NPC seems silly.
@@ -87,7 +103,17 @@ OnInit: // ... and after reload / restart
 		$xmas_day_of_december = 0; // double-double-tap to make sure no one can get any reward!
 		donpcevent "init_xmas::OnDisable";
 	}
-	
+    //= EINSTELLUNG: Weihnachtsbaum-Position
+
+    $xmas_tree_map$ = "xmas"; // xmas = Lutie, prontera = ....
+    $xmas_tree_x = 147;
+    $xmas_tree_y = 142;
+
+    //= EINSTELLUNG: Position von Santa Clues, dem Weihnachtshelfer (Main Quest NPC)
+    $xmas_santa_x = 147;
+    $xmas_santa_y = 142;
+
+
 	//= EINSTELLUNG: Minimum Baselevel um beim Event mitzumachen. 0 oder 1 ohne Beschränkung (jeder ist mindestens Level 1)
 	$xmas_minimum_baselevel = 50;
 	
@@ -125,18 +151,18 @@ OnInit: // ... and after reload / restart
     //= Die wörter werden so angezeigt wie in der Liste, aber bei der Eingabe ist egal ob Groß oder Kleinschrebung verwendet wird.
 	//= Es darf KEINE doppelten Wörter geben!
 	setarray $@door_hints$[0],
-					"FISH","GIFT","CAKE","TREE","HOME","MAIL","BUFF","SHOE","CANE","SNOW",
-                    "HORSE","PLANT","ROSE","CANDLE","ROOF","ICE","SLED","BOX","PAN","PICTURE",
-                    "POWER","LOVE","SMILE","CLOAK","PANTS","MILK","APPLE","OMEN","BAG","KISS",
-                    "COOKIE","COFFEE","FLOOR","CAT","DOG","BIRD","WIFE","MOTHER","FLOWER","WORLD",
-                    "NUTS","KEYBOARD","MOUSE","WATER","KETTLE","SUGAR","SHIRT","DICE","CARD","KING",
-                    "QUEEN","JACK","NIGHT","SANTA","PLATE","FORK","WAY","PAPER","TIARA","CROWN",
-                    "RIBBON","SHIELD","COASTER","SHIP","RUM","OCEAN","DOLPHIN","WHALE","EAGLE","YEAR",
-                    "RING","TOKEN","DOOR","CHAIR","PILLOW","COVER","BOTTLE","SHELL","TURTLE","HOUSE",
-                    "MAP","SOCK","FLUFFY";
+					"FISCH","SCHACHTEL","KUCHEN","TANNENBAUM","HEIMAT","BRIEF","ZABUER","SCHUH","ZUCKERSTANGE","SCHNEE",
+                    "PFERD","PFLANZE","STERN","KERZE","KAMINFEUER","LEBKUCHEN","SCHLITTEN","GESCHENK","OFEN","BILD",
+                    "KRAFT","LIEBE","GRINSEN","MANTEL","HOSE","MILCH","APFEL","INVICTUS","TASCHE","KUSS",
+                    "KEKS","KAFFEEE","BODEN","KATZE","HUND","VOGEL","FREUNDE","MUTTER","BLUME","WELT",
+                    "NUSS","PIANO","MAUS","WASSER","KESSEL","ZUCKER","HEMD","SPIEL","KARTE","KAISER",
+                    "PRINZESSIN","JACKE","NACHT","SANTA","TABLETT","GABEL","WEG","PAPIER","TIARA","KRONE",
+                    "SCHLEIFE","SCHILD","ACHTERBAHN","SCHIFF","SCHNAPS","OZEAN","STOLLEN","MARZIPAN","ADLER","JAHR",
+                    "RING","ZEICHEN","PORTAL","STUHL","KISSEN","SCHUTZ","FLASCHE","SCHALE","HASE","HAUS",
+                    "KARTE","SOCKE","HONIG";
 					
 	//= EINSTELLUNG: Ersatzwörter für Dopplungen. Manchmal ist ein "falsches" Wort zufällig auch das "richtige" Codewort. Dann wird es einfach durch eines aus dieser Liste getauscht. Dise Wörter dürfen nicht in der Liste oben vorkommen!
-	setarray $@badwords[0],"FIRE","PAIN","BLOOD","WOUND","FEAR";
+	setarray $@badwords[0],"FEUER","SCHMERZ","BLUT","WUNDE","ANGST";
 	
 	// effects to play at random when opening the doors and boxes
 	setarray $@randeffects[0], 66,67,75,76,84,85,86,41,42,40,38,37,88,98,103,154,155;
@@ -364,7 +390,7 @@ OnWhisperGlobal:
 	}
 	close;
 }
-prontera,155,203,4	script	Weihnachtsbaum	-1,6,6,{
+prontera,1,1,4	script	Weihnachtsbaum	-1,6,6,{
 	if ($xmas_calendar_active == 0) {
 		end;
 	}
@@ -643,7 +669,12 @@ prontera,156,115,4	script	Santa Clues	-1,{
 					mes "Du hast noch keine Kästchen geöffnet!";
 					mes " ";
 					mes "Ich hoffe Du erinnerst Dich an die richtigen ^ff0000Codewörter^000000 um das Kästchen zu öffnen?";
-					mes "Geh zum ^0000ffWeihnachtsbaum^000000 im Zentrum von Prontera um Deine Belohnung zu erhalten!";
+					next;
+					mes "[^007fffSanta Clues^000000]";
+					mes "Geh zum "+$xmas_navi$+" um Deine Belohnung zu erhalten!";
+					mes " ";
+                    
+					mes "Wenn Du die Codewörter nicht mehr weißt, beginne neu bei ^ff0000Tag 1^000000!";
 					next;
 				}
 			
@@ -675,9 +706,9 @@ prontera,156,115,4	script	Santa Clues	-1,{
 				if (.@wears_a_hat == 0) {
 					clear;
 					mes "[^007fffSanta Clues^000000]";
-					mes "Nd ann, Zeit ihn anzuziehen!";
+					mes "Na dann, Zeit ihn anzuziehen!";
 					mes " ";
-					mes "Meine Helfer reden nicht mit jemandem, der nicht in Weihnachtsstimmung ist!";
+					mes "Meine Helfer reden nur mit jemandem, der in Weihnachtsstimmung ist!";
 					close;
 				}
 				// santa hat and not the last day.
@@ -738,7 +769,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 						mes "Du hast Recht, ^0000ff"+.@keyword$+"^000000 stimmt!";
 						mes " ";
 						mes "Hier ist der Hinweis für ";
-						mes "Codewort ^ff007f"+(.@keyword_number+1)+"^000000 für Tag ^0000ff"+.@calendary_day+"^000000";
+						mes "^ff007fCodewort "+(.@keyword_number+1)+"^000000 für ^0000ffTag "+.@calendary_day+"^000000";
 						close2;
 						.@calendar_index = getCalendarIndex(#current_calendar_door);
 						viewpoint 0,$@door_coordinates[.@calendar_index*2],$@door_coordinates[.@calendar_index*2+1],0,0xFFFF00;
@@ -773,26 +804,42 @@ prontera,156,115,4	script	Santa Clues	-1,{
 				// no santa hat, player wants to trade in
 				if (.@wears_a_hat == 0) {
 					clear;
+                    if (countitem(10019) > 0) {
+                        mes "[^007fffSanta Clues^000000]";
+                        mes "Oh, Du besitzt bereits ein seltsames Stück roten Stoffs!";
+                        mes " ";
+                        mes "Lass mich Dir mit etwas ";
+                        mes "^007fffWEIHNACHTS ZAUBEREI^000000";
+                        mes "helfen!";
+                        next;
+                        callsub Build_Santa_Hat;
+                        close;
+                    }
+                    callsub Explain_Santa_Hat;
 					if (countitem(507) < 5 || countitem(938) < 5 || countitem(914) < 20) {
-						if (countitem(10019) > 0) {
-							mes "[^007fffSanta Clues^000000]";
-							mes "Oh, Du besitzt bereits ein seltsames Stück roten Stoffs!";
-							mes " ";
-							mes "Lass mich Dir mit etwas ";
-							mes "^007fffETWAS WEIHNACHTS ZAUBEREI^000000";
-							mes "helfen!";
-							next;
-							callsub Build_Santa_Hat;
-							close;
-						}
-						callsub Explain_Santa_Hat;
 						close;
 					}
 					else {
+                        next;
 						mes "[^007fffSanta Clues^000000]";
-						mes "Ohoho!";
-						mes "Okay, lass uns beginnen! Reibe die Red Herbs klein!";
-						while (select("Mische die Red Herbs wild durcheinander","Zermahle die Red Herbs vorsichtig","Klatsche aufgeregt in die Hände") != 2 ) {
+						mes "Ich sehe, du hast alle Zutaten!";
+                        mes " ";
+						mes "Soll ich Dir jetzt einen Santa Hat basteln?";
+						if (select("Ja! Bitte!"," ~ nein lieber nicht") == 2 ) {
+                            clear;
+							mes "[^007fffSanta Clues^000000]";
+							mes "In Ordnung!";
+                            mes " ";
+							mes "Komm wieder wenn Du es Dir anders überlegst!";
+                            close;
+						}
+						clear;
+						mes "[^007fffSanta Clues^000000]";
+						mes " ~ Ohoho!";
+						mes "Okay, lass uns beginnen!";
+						mes " ";
+                        mes "Reibe die Red Herbs klein!";
+						while (select("Mische die Red Herbs wild durcheinander","Zermahle die Red Herbs vorsichtig","Klatsche aufgeregt in die Hände","Fang an zu schielen") != 2 ) {
 							progressbar "007FFF",1;
 						}
 						progressbar "007FFF",1;
@@ -800,7 +847,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 						mes "[^007fffSanta Clues^000000]";
 						mes "^ff0000Nah dran!^000000";
 						mes "Jetzt webe einen Stoff aus den Fluffs!";
-						while (select("stopfe die Fluffs ineinander","webe sorgsam etwas Fluff-Stoff","Koste etwas von dem Red Herb Pulver") != 2) {
+						while (select("Stopfe die Fluffs ineinander","Webe sorgsam etwas Fluff-Stoff","Koste etwas von dem Red Herb Pulver","Zermahle das Sticky Mucus") != 2) {
 							progressbar "007FFF",1;
 						}
 						progressbar "007FFF",1;
@@ -808,7 +855,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 						mes "[^007fffSanta Clues^000000]";
 						mes "^00A000Haha sehr gut!^000000";
 						mes "Jetzt färbe den Stoff mit dem Red Herb Pulver";
-						while (select("Steck deine Finger in den Mucus","Füll das Red Herb Pulver in den Fluff-Stoff-Beutel","Verteile das Red Herb Pulver gleichmäßig auf dem Fluff-Stoff") != 3) {
+						while (select("Steck deine Finger in den Mucus","Kuschle mit dem Fluff","Mische sorgsam Fluff und Red Herb Pulver","Verteile das Red Herb Pulver auf dem Boden") != 3) {
 							progressbar "007FFF",1;
 						}
 						progressbar "007FFF",1;
@@ -816,7 +863,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 						mes "[^007fffSanta Clues^000000]";
 						mes "^007fffDas sollte klappen.^000000";
 						mes "Jetzt kleb alles zusammen mit dem Sticky Mucus";
-						select("glätte den Fluff und überziehe es mit Sticky Mucus","Drück den roten Fluff-Stoff auf das Sticky Mucus","~~fummel es ^ff0000~~IR~GEND~WIE~~^000000 zusammen");
+						select("Tropfe das Mucus auf den roten Fluffstoff","Drück den roten Fluffstoff aufs Mucus","~~fummel es ^ff0000~~IR~GEND~WIE~~^000000 zusammen");
 						progressbar "007FFF",3;
 						specialeffect2 155;
 						delitem 507,5; // Red Herb
@@ -831,7 +878,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 						mes "[^007fffSanta Clues^000000]";
 						mes " ";
                         mes "Lass mich Dir mit etwas ";
-                        mes "^007fffETWAS WEIHNACHTS ZAUBEREI^000000";
+                        mes "^007fffWEIHNACHTS ZAUBEREI^000000";
                         mes "helfen!";
 						next;
 						callsub Build_Santa_Hat;
@@ -895,7 +942,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 				.@keyword_number = ((#current_calendar_door-1) % 3 +1);
 				mes "[^007fffSanta Clues^000000]";
 				mes "Gut, Du kannst nun beginnen das ";
-				mes "Codewort ^ff007f"+.@keyword_number+"^000000 für Tag ^0000ff"+.@calendary_day+"^000000";
+				mes "^ff007fCodewort "+.@keyword_number+"^000000 für ^0000ffTag "+.@calendary_day+"^000000 zu finden.";
 				mes " ";
 				if (.@calendary_day != #current_calendar_door) {
 					mes "^ff0000Beachte^000000, du musst die Kästchen trotzdem in der ^ff0000richtigen Reihenfolge^000000 öffnen.";
@@ -946,7 +993,8 @@ Explain_Calendar:
 	mes "Aber ich gebe Dir nur neue Hinweise, nachdem Du mir die vorherigen Codewörter genannt hast!";
 	next;
 	mes "[^007fffSanta Clues^000000]";
-	mes "Die ^ff00003^000000 Codewörter des ^ff0000jeweiligen Tages^000000 sind die Kombination für das passende Kästchen am Weihnachtsbaum.";
+//= EINSTELLUNG: Hier bitte den NAVI-Link zum Weihnachtsbaum anpassen
+	mes "Die ^ff00003^000000 Codewörter des ^ff0000jeweiligen Tages^000000 sind die Kombination für das passende Kästchen am "+$xmas_navi$+".";
 	next;
 	mes "[^007fffSanta Clues^000000]";
 	mes "Also merk Dir die Codewörter, und die richtige Reihenfolge!";
