@@ -4,7 +4,7 @@
 //= Mr.Amity
 //= $svn.203-ef6a3b: S3ph1r0th
 //===== Current Version: =====================================
-//= 1.1de 2022-11-01
+//= 1.2de 2022-11-01
 //===== Compatible With: =====================================
 //= rAthena Project
 //===== Beschreibung: =========================================
@@ -82,7 +82,7 @@ OnEnable:
     // muss in Prontera stehen, da sonst die Schnitzeljagd mit den Türen keinen Sinn macht
     // "prontera", 156, 115 = untere Kreuzung
     // "prontera", 156, 282 = oben an der Hand-Statue
-    unitwarp getnpcid(0,"Santa Clues"), "prontera", 156, 282;
+    unitwarp getnpcid(0,"Santa Clues"), "prontera", 156, 115;
 
 	end;
 OnDisable:
@@ -942,7 +942,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 				.@keyword_number = ((#current_calendar_door-1) % 3 +1);
 				mes "[^007fffSanta Clues^000000]";
 				mes "Gut, Du kannst nun beginnen das ";
-				mes "^ff007fCodewort "+.@keyword_number+"^000000 für ^0000ffTag "+.@calendary_day+"^000000 zu finden.";
+				mes "^ff007fCodewort "+.@keyword_number+"^000000 für ^0000ffTag "+.@calendary_day+"^000000";
 				mes " ";
 				if (.@calendary_day != #current_calendar_door) {
 					mes "^ff0000Beachte^000000, du musst die Kästchen trotzdem in der ^ff0000richtigen Reihenfolge^000000 öffnen.";
