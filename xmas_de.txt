@@ -942,7 +942,7 @@ prontera,156,115,4	script	Santa Clues	-1,{
 				.@keyword_number = ((#current_calendar_door-1) % 3 +1);
 				mes "[^007fffSanta Clues^000000]";
 				mes "Gut, Du kannst nun beginnen das ";
-				mes "^ff007fCodewort "+.@keyword_number+"^000000 für ^0000ffTag "+.@calendary_day+"^000000";
+				mes "^ff007fCodewort "+.@keyword_number+"^000000 für ^0000ffTag "+.@calendary_day+"^000000 zu finden";
 				mes " ";
 				if (.@calendary_day != #current_calendar_door) {
 					mes "^ff0000Beachte^000000, du musst die Kästchen trotzdem in der ^ff0000richtigen Reihenfolge^000000 öffnen.";
